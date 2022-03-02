@@ -53,13 +53,21 @@ ossize=0
 imsize=0
 tm=datetime.date.today()
 
+hexchecksum = 0
+
 def BCD(x):
-    return (((x)/10)*16)+((x)%10)
+    result = ((x // 10) * 16) + (x % 10)
+    print('BCD -> {}'.format(result))
+    return result
 def RECSIZE(n):
-    return 13+(2*(n))
+    result = 13 + (2 * n)
+    print('RECSIZE -> {}'.format(result))
+    return result
 
 def PUTRHEX(x):
-    outfile.write(hex(x)[2:].zfill(2).upper())
+    global hexchecksum
+    hexchecksum += x
+    outfile.write(hex(x)[2:].zfill(2).upper().encode())
 
 # Not necessary for Python conversion
 # def putrec(n, a, t, data):
@@ -95,7 +103,7 @@ def main(argc, argv):
     # It doesn't matter what we put here -- it won't validate anyway --
     # and using this data at least eliminates any copyright claims :)
 
-    sig_data = [
+    sig_data_list = [
         0x02,0x0d,0x40,
         0x03,0x14,0x15,0x92, 0x65,0x35,0x89,0x79,
         0x32,0x38,0x46,0x26, 0x43,0x38,0x32,0x79,
@@ -111,20 +119,25 @@ def main(argc, argv):
         0xff,0xff,0xff,0xff, 0xff,0xff,0xff,0xff,
         0xff,0xff,0xff,0xff, 0xff]
 
+    sig_data = b''
+    for i in sig_data_list:
+        sig_data += i.to_bytes(1, 'big')
+
     # I have no idea what this means.
 
-    end_str = "   -- CONVERT 2.6 --\r\n\032"
+    end_str = b'"   -- CONVERT 2.6 --\r\n\032'
 
     # Not necessary for Python conversion
     # infile = stdin
     # outfile = stdout
 
-    for i in range(1, argc):
+    i = 0
+    while i < argc:
         print('argv: {}'.format(argv[i]))
         if argv[i][0] == '-':
-            if argv[i][1] == '':
+            if len(argv[i]) == 1:
                 infile = sys.stdin
-            elif argv[i][2]:
+            elif len(argv[i]) >= 3:
                 cmdline(argv[i][1],argv[i]+2, argv)
             else:
                 cmdline(argv[i][1],argv[i+1], argv)
@@ -134,6 +147,7 @@ def main(argc, argv):
                 infile=open(argv[i],"rb")
             except FileNotFoundError:
                 raise Exception("{}: unable to open hex file {}".format(argv[0],argv[i]))
+        i += 1
 
     hdr_data[2] = (ossize>>24)&0xff
     hdr_data[3] = (ossize>>16)&0xff
@@ -150,38 +164,39 @@ def main(argc, argv):
     hdr_data[22] = (imsize>>8)&0xff
     hdr_data[23] = (imsize)&0xff
 
-    infile.seek(-1)
+    infile.seek(0, 2)
     fileLen = infile.tell()  # Get file size
-    infile.seek(0)
+    infile.seek(0, 0)
 
     fileLen += RECSIZE(hdr_size) + RECSIZE(0) + 3*RECSIZE(32) + RECSIZE(0) - 2 + len(end_str)
-
+    print('fileLen: {}'.format(fileLen))
     day = tm.day
     mon = tm.month
     yearh = int(str(tm.year)[0:2])
-    yearl = int(str(tm.year)[2:3])
+    yearl = int(str(tm.year)[2:4])
+    print(day, mon, yearh, yearl, tm.year)
 
-    outfile.write("**TIFL**")
+    outfile.write(b'**TIFL**')
 
-    outfile.write(0)
-    outfile.write(0)
+    outfile.write(b'\x00')
+    outfile.write(b'\x00')
 
-    outfile.write("\001\210{}{}{}{}\010basecode".format(BCD(mon), BCD(day), BCD(yearh), BCD(yearl)))
+    outfile.write(b'\001\210' + BCD(mon).to_bytes(1, 'big') + BCD(day).to_bytes(1, 'big') + BCD(yearh).to_bytes(1, 'big') + BCD(yearl).to_bytes(1, 'big') + b'\010basecode')
 
     for i in range(23):
-        outfile.write(0);		# A whole bunch of zeroes.
+        outfile.write(b'\x00')		# A whole bunch of zeroes.
 
-    outfile.write(calc)		# Type of calculator
-    outfile.write(0x23)		# "Data type" for OS upgrade
+    outfile.write(calc.to_bytes(1, 'big'))		# Type of calculator
+    outfile.write(b'\x23')		# "Data type" for OS upgrade
 
     for i in range(24):
-        outfile.write(0)		# And even more zeroes.
-
-    outfile.write(fileLen & 0xff)	# The length of the entire rest of the file
-    outfile.write((fileLen >> 8) & 0xff)
-    outfile.write((fileLen >> 16) & 0xff)
-    outfile.write((fileLen >> 24) & 0xff)
-
+        outfile.write(b'\x00')		# And even more zeroes.
+    
+    outfile.write((fileLen & 0xff).to_bytes(1, 'big'))	# The length of the entire rest of the file
+    outfile.write(((fileLen >> 8) & 0xff).to_bytes(1, 'big'))
+    outfile.write(((fileLen >> 16) & 0xff).to_bytes(1, 'big'))
+    outfile.write(((fileLen >> 24) & 0xff).to_bytes(1, 'big'))
+    # outfile.write(b'\xde\xad\xbe\xef')
     # OS header
     putrec(hdr_size, 0, 0, hdr_data)
     putrec(0, 0, 1, None)
@@ -189,14 +204,14 @@ def main(argc, argv):
     # Actual OS data
     for i in range(fileLen):
         c = infile.read(1)
-        if c < 128:
+        if int.from_bytes(c, 'big') < 128:
             outfile.write(c)
     
 
     # And a dumb signature
     putrec(32, 0, 0, sig_data)
-    putrec(32, 32, 0, sig_data+32)
-    putrec(32, 64, 0, sig_data+64)
+    putrec(32, 32, 0, sig_data + b'\x32')
+    putrec(32, 64, 0, sig_data + b'\x64')
     putrec(0, 0, -1, None)
     outfile.write(end_str)
 
@@ -209,39 +224,42 @@ def main(argc, argv):
 
 def putrec(n, a, t, data):
     # // Use t=-1 to get the final record without newline
-    c = 0
-    outfile.write(':')
+    global hexchecksum  # variable `c` in C version
+    hexchecksum = 0
+    outfile.write(b':')
 
     PUTRHEX(n)
-    PUTRHEX( (a >> 8) & 0xff)
+    PUTRHEX((a >> 8) & 0xff)
     PUTRHEX(a & 0xff)
     PUTRHEX(-t if t < 0 else t)
 
     for i in range(n):
         PUTRHEX(data[i])
 
-    PUTRHEX(256-(c&0xff))
+    PUTRHEX(256 - (hexchecksum & 0xff))
 
     if t >= 0:
-        outfile.write("\r\n")
+        outfile.write(b'\r\n')
 
 
 
-def cmdline(opt, val, **argv):
-    # float foo;
-    # int i;
+def cmdline(opt, val, argv):
+    global certid
+    global outfile
+
+    print('cmdline({}, {}, {})'.format(opt, val, argv))
 
     if opt == 'd':
         if val == '/':
-            val = "%d/%d/%d".format(tm.month, tm.day, tm.year)
+            val = "{}/{}/{}".format(tm.month, tm.day, tm.year)
         else:
-            val = "%d%d%d".format(tm.day, tm.month, tm.year)
+            val = "{}{}{}".format(tm.day, tm.month, tm.year)
         if tm.year > 1900:
             tm.year -= 1900     # POTENTIAL BREAKAGE
     elif opt == 'v':
         foo = '{}'.format(val)
-        v_major = int(foo)
-        v_minor = (int(foo) * 100) % 100
+        v_major = int(float(foo))
+        v_minor = (int(float(foo)) * 100) % 100
     elif opt == 't':
         if val == '73':
             calc = 0x74
