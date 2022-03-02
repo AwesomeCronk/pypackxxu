@@ -119,9 +119,10 @@ def main(argc, argv):
     # infile = stdin
     # outfile = stdout
 
-    for i in range(1, fileLen(argc)):
+    for i in range(1, argc):
+        print('argv: {}'.format(argv[i]))
         if argv[i][0] == '-':
-            if argv[i][1] == 0:
+            if argv[i][1] == '':
                 infile = sys.stdin
             elif argv[i][2]:
                 cmdline(argv[i][1],argv[i]+2, argv)
@@ -272,3 +273,6 @@ def cmdline(opt, val, **argv):
                 exit(1)
     else:
         raise Exception("{}: unknown option '{}'\n".format(argv[0], opt))
+
+if __name__ == '__main__':
+    main(len(sys.argv), sys.argv)
