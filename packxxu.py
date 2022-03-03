@@ -89,7 +89,7 @@ def main(argc, argv):
     hdr_data = [
         # Unknown field (size doesn't matter)
         0x80,0x0f, 0x00,0x00,0x00,0x00,
-        # Developer key (certificate ID = 4 for 83+, 2 for 73)
+        # Developer key (certificate ID = 2 for 73, 4 for 83+, 10 for 84+)
         0x80,0x11, 0x00,
         # Revision number (may want to set this really high so all OS's will accept)
         0x80,0x21, 0x00,
@@ -248,6 +248,7 @@ def putrec(n, a, t, data):
 
 
 def cmdline(opt, val, argv):
+    global calc
     global certid
     global outfile
 
@@ -267,12 +268,15 @@ def cmdline(opt, val, argv):
     elif opt == 't':
         if val == '73':
             calc = 0x74
-            certid = 2
+            certid = 0x02
         elif val == '83p':
             calc = 0x73
-            certid = 4
+            certid = 0x04
+        elif val == '84p':
+            calc = 0x73
+            certid = 0x0a
         else:
-            raise Exception("{}: unknown calculator type {}. Try '73' or '83p'.".format(argv[0],val))
+            raise Exception("{}: unknown calculator type {}. Try '73', '83p', or '84p.".format(argv[0],val))
 
     elif opt == 'c':
         val = "%x".format(calc)     # POTENTIAL BREAKAGE
