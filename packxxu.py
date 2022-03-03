@@ -1,3 +1,5 @@
+#!/bin/env python3
+
 ### Copyright 2021 Clayton Cronk
 ### Original packxxu license:
 # XXU Packer
@@ -85,17 +87,19 @@ def main(argc, argv):
     global outfile
 
     hdr_data = [
-        # // Size doesn't matter
+        # Unknown field (size doesn't matter)
         0x80,0x0f, 0x00,0x00,0x00,0x00,
-        # // Certificate ID = 4 for 83+, 2 for 73
+        # Developer key (certificate ID = 4 for 83+, 2 for 73)
         0x80,0x11, 0x00,
-        # // Version major (may want to set this really high so all OS's will accept)
+        # Revision number (may want to set this really high so all OS's will accept)
         0x80,0x21, 0x00,
-        # // Version minor
+        # Build number
         0x80,0x31, 0x00,
-        # // Hardware compatibility (may want to set this to FF)
+        # Max hardware revision (may want to set this to FF)
         0x80,0xa1, 0x00,
-        # // Size doesn't matter here either
+        # Page count
+        0x80,0x81, 0x01,
+        # Last field (size doesn't matter here either)
         0x80,0x7f, 0x00,0x00,0x00,0x00]
 
     hdr_size = 6+3+3+3+3+6
@@ -159,10 +163,10 @@ def main(argc, argv):
     hdr_data[14] = v_minor
     hdr_data[17] = hardware
 
-    hdr_data[20] = (imsize>>24)&0xff
-    hdr_data[21] = (imsize>>16)&0xff
-    hdr_data[22] = (imsize>>8)&0xff
-    hdr_data[23] = (imsize)&0xff
+    hdr_data[23] = (imsize>>24)&0xff
+    hdr_data[24] = (imsize>>16)&0xff
+    hdr_data[25] = (imsize>>8)&0xff
+    hdr_data[26] = (imsize)&0xff
 
     infile.seek(0, 2)
     fileLen = infile.tell()  # Get file size
@@ -223,7 +227,7 @@ def main(argc, argv):
 
 
 def putrec(n, a, t, data):
-    # // Use t=-1 to get the final record without newline
+    # Use t=-1 to get the final record without newline
     global hexchecksum  # variable `c` in C version
     hexchecksum = 0
     outfile.write(b':')
